@@ -39,7 +39,7 @@ button.ghost{background:transparent;color:var(--accent);border:1.5px solid var(-
   <button id="btn">Konumumu Bul</button>
   <div id="msg"></div>
   <div id="out">
-    <div class="row"><span id="altLabel">Mahalle</span><span id="alt">–</span></div>
+    <div class="row"><span>Bölge</span><span id="alt">–</span></div>
     <div class="row"><span>İlçe</span><span id="ilce">–</span></div>
     <div class="row"><span>İl</span><span id="il">–</span></div>
     <div class="row"><span>Ülke</span><span id="ulke">–</span></div>
@@ -68,7 +68,6 @@ btn.addEventListener('click',()=>{
       const koy=a.village||a.hamlet||'';
       let alt=koy||a.neighbourhood||a.quarter||a.suburb||'';
       if(alt===ilce||alt===il)alt=koy||a.neighbourhood||a.quarter||'';
-      document.getElementById('altLabel').textContent=koy?'Köy':'Mahalle';
       set('alt',alt);set('ilce',ilce);set('il',il);set('ulke',a.country);
       last=la.toFixed(6)+', '+lo.toFixed(6);
       set('lat',la.toFixed(6));set('lon',lo.toFixed(6));
