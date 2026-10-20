@@ -20,6 +20,7 @@ button:disabled{opacity:.6;cursor:wait}
 .row:last-child{border-bottom:0}
 .row span:first-child{color:var(--muted)}
 .row span:last-child{font-weight:600}
+button.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent);margin-top:16px}
 #msg{margin-top:18px;color:var(--muted);font-size:14px;min-height:18px}
 </style>
 <link rel="manifest" href="manifest.webmanifest">
@@ -38,13 +39,19 @@ button:disabled{opacity:.6;cursor:wait}
   <button id="btn">Konumumu Bul</button>
   <div id="msg"></div>
   <div id="out">
+    <div class="row"><span id="altLabel">Mahalle</span><span id="alt">–</span></div>
     <div class="row"><span>İlçe</span><span id="ilce">–</span></div>
     <div class="row"><span>İl</span><span id="il">–</span></div>
     <div class="row"><span>Ülke</span><span id="ulke">–</span></div>
+    <div class="row"><span>Enlem</span><span id="lat">–</span></div>
+    <div class="row"><span>Boylam</span><span id="lon">–</span></div>
+    <div class="row"><span>Doğruluk</span><span id="acc">–</span></div>
+    <button id="copy" class="ghost">Koordinatları Kopyala</button>
   </div>
 </div>
 <script>
 const btn=document.getElementById('btn'),msg=document.getElementById('msg'),out=document.getElementById('out');
+let last='';
 function set(id,v){document.getElementById(id).textContent=v||'–'}
 btn.addEventListener('click',()=>{
   if(!navigator.geolocation){msg.textContent='Tarayıcın konum özelliğini desteklemiyor.';return}
@@ -53,12 +60,19 @@ btn.addEventListener('click',()=>{
     try{
       msg.textContent='Adres çözümleniyor…';
       const {latitude:la,longitude:lo}=pos.coords;
-      const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&addressdetails=1&accept-language=tr&lat=${la}&lon=${lo}`);
+      const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&accept-language=tr&lat=${la}&lon=${lo}`);
       if(!r.ok)throw new Error('http '+r.status);
       const a=(await r.json()).address||{};
       const il=a.province||a.state||a.city||'';
       const ilce=a.town||a.county||a.city_district||a.suburb||(a.city&&a.city!==il?a.city:'')||'';
-      set('ilce',ilce);set('il',il);set('ulke',a.country);
+      const koy=a.village||a.hamlet||'';
+      let alt=koy||a.neighbourhood||a.quarter||a.suburb||'';
+      if(alt===ilce||alt===il)alt=koy||a.neighbourhood||a.quarter||'';
+      document.getElementById('altLabel').textContent=koy?'Köy':'Mahalle';
+      set('alt',alt);set('ilce',ilce);set('il',il);set('ulke',a.country);
+      last=la.toFixed(6)+', '+lo.toFixed(6);
+      set('lat',la.toFixed(6));set('lon',lo.toFixed(6));
+      set('acc',pos.coords.accuracy?'±'+Math.round(pos.coords.accuracy)+' m':'');
       out.style.display='block';msg.textContent='';
     }catch(e){msg.textContent='Adres bilgisi alınamadı. İnternet bağlantını kontrol edip tekrar dene.'}
     btn.disabled=false;
@@ -66,6 +80,11 @@ btn.addEventListener('click',()=>{
     const t={1:'Konum izni verilmedi. Tarayıcı ayarlarından izin verip tekrar dene.',2:'Konum belirlenemedi.',3:'Konum isteği zaman aşımına uğradı.'};
     msg.textContent=t[err.code]||'Bir hata oluştu.';btn.disabled=false;
   },{enableHighAccuracy:false,timeout:15000,maximumAge:60000});
+});
+document.getElementById('copy').addEventListener('click',async e=>{
+  const b=e.currentTarget;
+  try{await navigator.clipboard.writeText(last);b.textContent='Kopyalandı ✓'}catch(_){b.textContent='Kopyalanamadı'}
+  setTimeout(()=>b.textContent='Koordinatları Kopyala',1800);
 });
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 </script>
