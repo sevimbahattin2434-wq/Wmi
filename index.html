@@ -4,25 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Nerdeyiz?</title>
-<style>
-:root{--bg:#f6f4ef;--card:#fff;--text:#1d1d1b;--muted:#6b6a66;--accent:#d9480f;--line:#e4e1d8}
-@media (prefers-color-scheme:dark){:root{--bg:#161614;--card:#211f1d;--text:#f2efe8;--muted:#9d9a92;--accent:#ff8a4c;--line:#34312d}}
-*{box-sizing:border-box}
-html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:32px 28px;width:100%;max-width:420px;text-align:center}
-h1{margin:0 0 6px;font-size:28px}
-p.sub{margin:0 0 24px;color:var(--muted);font-size:15px}
-button{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:14px 26px;font-size:16px;font-weight:600;cursor:pointer;width:100%}
-button:disabled{opacity:.6;cursor:wait}
-#out{margin-top:24px;display:none;text-align:left}
-.row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line)}
-.row:last-child{border-bottom:0}
-.row span:first-child{color:var(--muted)}
-.row span:last-child{font-weight:600}
-button.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent);margin-top:16px}
-#msg{margin-top:18px;color:var(--muted);font-size:14px;min-height:18px}
-</style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#d9480f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -31,11 +12,47 @@ button.ghost{background:transparent;color:var(--accent);border:1.5px solid var(-
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--text:#1d1d1b;--muted:#6b6a66;--accent:#d9480f;--line:#e4e1d8}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--card:#211f1d;--text:#f2efe8;--muted:#9d9a92;--accent:#ff8a4c;--line:#34312d}}
+*{box-sizing:border-box}
+html,body{min-height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px 24px;width:100%;max-width:420px;text-align:center}
+h1{margin:0 0 6px;font-size:28px}
+h2{margin:0 0 8px;font-size:15px;color:var(--muted);font-weight:600}
+p.sub{margin:0 0 20px;color:var(--muted);font-size:15px}
+.opt{display:block;text-align:left;margin-bottom:14px;font-size:14px;color:var(--muted)}
+select{display:block;width:100%;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:16px}
+button{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:14px 26px;font-size:16px;font-weight:600;cursor:pointer;width:100%}
+button:disabled{opacity:.6;cursor:wait}
+button.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent);margin-top:16px}
+button.stop{background:#c92a2a}
+#out{margin-top:22px;display:none;text-align:left}
+.row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.row span:first-child{color:var(--muted)}
+.row span:last-child{font-weight:600;text-align:right}
+#msg{margin-top:16px;color:var(--muted);font-size:14px;min-height:18px}
+#logBox{display:none;margin-top:22px;text-align:left}
+#log{list-style:none;margin:0;padding:0;font-size:14px}
+#log li{padding:8px 0;border-bottom:1px solid var(--line)}
+#log small{color:var(--muted);margin-right:6px}
+.note{margin:14px 0 0;color:var(--muted);font-size:12.5px;line-height:1.45}
+</style>
 </head>
 <body>
 <div class="card">
   <h1>📍 Nerdeyiz?</h1>
   <p class="sub">Konumunu paylaş, nerede olduğunu söyleyelim.</p>
+  <label class="opt">Bildirim
+    <select id="mode">
+      <option value="off">Kapalı (sadece manuel)</option>
+      <option value="alt">Bölge değişince</option>
+      <option value="ilce">İlçe değişince</option>
+      <option value="il">İl değişince</option>
+      <option value="ulke">Ülke değişince</option>
+    </select>
+  </label>
   <button id="btn">Konumumu Bul</button>
   <div id="msg"></div>
   <div id="out">
@@ -48,43 +65,153 @@ button.ghost{background:transparent;color:var(--accent);border:1.5px solid var(-
     <div class="row"><span>Doğruluk</span><span id="acc">–</span></div>
     <button id="copy" class="ghost">Koordinatları Kopyala</button>
   </div>
+  <div id="logBox"><h2>Son değişiklikler</h2><ul id="log"></ul></div>
+  <p class="note" id="note"></p>
 </div>
 <script>
-const btn=document.getElementById('btn'),msg=document.getElementById('msg'),out=document.getElementById('out');
-let last='';
-function set(id,v){document.getElementById(id).textContent=v||'–'}
-btn.addEventListener('click',()=>{
+const $=id=>document.getElementById(id);
+const btn=$('btn'),msg=$('msg'),out=$('out'),modeSel=$('mode');
+const LABEL={alt:'Bölge',ilce:'İlçe',il:'İl',ulke:'Ülke'};
+let last='',watchId=null,wakeLock=null,cur=null,lastGeo={la:0,lo:0,t:0},busy=false,logs=[];
+
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(_){return null}}
+function set(id,v){$(id).textContent=v||'–'}
+function tracking(){return watchId!==null}
+function hhmm(){return new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}
+function dist(a,b,c,d){const R=6371000,r=x=>x*Math.PI/180,dl=r(c-a),dn=r(d-b);
+  const h=Math.sin(dl/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+
+function updateUI(){
+  const off=modeSel.value==='off';
+  btn.className=(!off&&tracking())?'stop':'';
+  btn.textContent=off?'Konumumu Bul':(tracking()?'Takibi Durdur':'Takibi Başlat');
+  $('note').textContent=off?'':'Takip, uygulama açıkken çalışır. Ekran kilitlenirse veya başka uygulamaya geçersen durabilir; bu yüzden takip sırasında ekranı açık tutmaya çalışıyoruz.';
+}
+
+async function resolve(la,lo){
+  const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&accept-language=tr&lat=${la}&lon=${lo}`);
+  if(!r.ok)throw new Error('http '+r.status);
+  const a=(await r.json()).address||{};
+  const il=a.province||a.state||a.city||'';
+  const ilce=a.town||a.county||a.city_district||a.suburb||(a.city&&a.city!==il?a.city:'')||'';
+  const koy=a.village||a.hamlet||'';
+  let alt=koy||a.neighbourhood||a.quarter||a.suburb||'';
+  if(alt===ilce||alt===il)alt=koy||a.neighbourhood||a.quarter||'';
+  return {alt,ilce,il,ulke:a.country||''};
+}
+
+function show(info,c){
+  set('alt',info.alt);set('ilce',info.ilce);set('il',info.il);set('ulke',info.ulke);
+  showCoords(c);out.style.display='block';
+}
+function showCoords(c){
+  last=c.latitude.toFixed(6)+', '+c.longitude.toFixed(6);
+  set('lat',c.latitude.toFixed(6));set('lon',c.longitude.toFixed(6));
+  set('acc',c.accuracy?'±'+Math.round(c.accuracy)+' m':'');
+}
+
+/* ---------- Manuel mod ---------- */
+function manual(){
   if(!navigator.geolocation){msg.textContent='Tarayıcın konum özelliğini desteklemiyor.';return}
   btn.disabled=true;out.style.display='none';msg.textContent='Konum alınıyor…';
   navigator.geolocation.getCurrentPosition(async pos=>{
     try{
       msg.textContent='Adres çözümleniyor…';
-      const {latitude:la,longitude:lo}=pos.coords;
-      const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&accept-language=tr&lat=${la}&lon=${lo}`);
-      if(!r.ok)throw new Error('http '+r.status);
-      const a=(await r.json()).address||{};
-      const il=a.province||a.state||a.city||'';
-      const ilce=a.town||a.county||a.city_district||a.suburb||(a.city&&a.city!==il?a.city:'')||'';
-      const koy=a.village||a.hamlet||'';
-      let alt=koy||a.neighbourhood||a.quarter||a.suburb||'';
-      if(alt===ilce||alt===il)alt=koy||a.neighbourhood||a.quarter||'';
-      set('alt',alt);set('ilce',ilce);set('il',il);set('ulke',a.country);
-      last=la.toFixed(6)+', '+lo.toFixed(6);
-      set('lat',la.toFixed(6));set('lon',lo.toFixed(6));
-      set('acc',pos.coords.accuracy?'±'+Math.round(pos.coords.accuracy)+' m':'');
-      out.style.display='block';msg.textContent='';
+      const info=await resolve(pos.coords.latitude,pos.coords.longitude);
+      show(info,pos.coords);msg.textContent='';
     }catch(e){msg.textContent='Adres bilgisi alınamadı. İnternet bağlantını kontrol edip tekrar dene.'}
     btn.disabled=false;
-  },err=>{
-    const t={1:'Konum izni verilmedi. Tarayıcı ayarlarından izin verip tekrar dene.',2:'Konum belirlenemedi.',3:'Konum isteği zaman aşımına uğradı.'};
-    msg.textContent=t[err.code]||'Bir hata oluştu.';btn.disabled=false;
-  },{enableHighAccuracy:false,timeout:15000,maximumAge:60000});
+  },geoErr,{enableHighAccuracy:false,timeout:15000,maximumAge:60000});
+}
+function geoErr(err){
+  const t={1:'Konum izni verilmedi. Tarayıcı ayarlarından izin verip tekrar dene.',2:'Konum belirlenemedi.',3:'Konum isteği zaman aşımına uğradı.'};
+  msg.textContent=t[err.code]||'Bir hata oluştu.';btn.disabled=false;
+  if(err.code===1&&tracking())stopTracking();
+}
+
+/* ---------- Takip modu ---------- */
+async function notify(title,body){
+  try{vibrate()}catch(_){}
+  try{
+    if('Notification' in window&&Notification.permission==='granted'){
+      const reg=('serviceWorker' in navigator)?await navigator.serviceWorker.getRegistration():null;
+      const opt={body,icon:'icon-192.png',badge:'icon-192.png',tag:'nerdeyiz',renotify:true};
+      if(reg)await reg.showNotification(title,opt);else new Notification(title,opt);
+    }
+  }catch(_){}
+}
+function vibrate(){if(navigator.vibrate)navigator.vibrate([200,100,200])}
+
+function addLog(text){
+  logs.unshift(hhmm()+'|'+text);logs=logs.slice(0,8);
+  $('log').innerHTML='';
+  logs.forEach(l=>{const [t,x]=l.split('|');const li=document.createElement('li');
+    const s=document.createElement('small');s.textContent=t;li.appendChild(s);li.appendChild(document.createTextNode(x));$('log').appendChild(li)});
+  $('logBox').style.display='block';
+}
+
+async function onPos(pos){
+  const c=pos.coords;
+  if(out.style.display==='block')showCoords(c);
+  const now=Date.now();
+  if(busy)return;
+  if(cur&&(dist(lastGeo.la,lastGeo.lo,c.latitude,c.longitude)<150||now-lastGeo.t<20000))return;
+  busy=true;lastGeo.t=now;
+  try{
+    const info=await resolve(c.latitude,c.longitude);
+    lastGeo={la:c.latitude,lo:c.longitude,t:now};
+    const prev=cur;cur=info;show(info,c);
+    msg.textContent='Takip açık • Son kontrol: '+hhmm();
+    const lv=modeSel.value;
+    if(prev&&lv!=='off'&&prev[lv]&&info[lv]&&prev[lv]!==info[lv]){
+      const title=LABEL[lv]+' değişti',body=prev[lv]+' → '+info[lv];
+      addLog(title+': '+body);notify(title,body);
+      msg.textContent=title+': '+body;
+    }
+  }catch(e){msg.textContent='Takip açık • Adres şu an alınamadı, tekrar denenecek.'}
+  busy=false;
+}
+
+async function lockScreen(){
+  try{if('wakeLock' in navigator&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(_){}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&tracking())lockScreen()});
+
+async function startTracking(){
+  if(!navigator.geolocation){msg.textContent='Tarayıcın konum özelliğini desteklemiyor.';return}
+  let nmsg='';
+  if('Notification' in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(_){}}
+  if(!('Notification' in window)||Notification.permission!=='granted')nmsg=' Bildirim izni yok, değişiklikler sadece uygulama içinde görünür.';
+  cur=null;lastGeo={la:0,lo:0,t:0};
+  watchId=navigator.geolocation.watchPosition(onPos,geoErr,{enableHighAccuracy:false,maximumAge:30000,timeout:30000});
+  lockScreen();updateUI();
+  msg.textContent='Takip başladı, konum aranıyor…'+nmsg;
+}
+function stopTracking(){
+  if(watchId!==null)navigator.geolocation.clearWatch(watchId);
+  watchId=null;cur=null;
+  if(wakeLock){try{wakeLock.release()}catch(_){}wakeLock=null}
+  updateUI();msg.textContent='Takip durduruldu.';
+}
+
+/* ---------- Olaylar ---------- */
+btn.addEventListener('click',()=>{
+  if(modeSel.value==='off')return manual();
+  tracking()?stopTracking():startTracking();
 });
-document.getElementById('copy').addEventListener('click',async e=>{
+modeSel.addEventListener('change',()=>{
+  store('mode',modeSel.value);
+  if(modeSel.value==='off'&&tracking())stopTracking();
+  updateUI();
+  if(modeSel.value!=='off'&&tracking())msg.textContent='Takip açık • '+LABEL[modeSel.value]+' değişince haber verilecek.';
+});
+$('copy').addEventListener('click',async e=>{
   const b=e.currentTarget;
   try{await navigator.clipboard.writeText(last);b.textContent='Kopyalandı ✓'}catch(_){b.textContent='Kopyalanamadı'}
   setTimeout(()=>b.textContent='Koordinatları Kopyala',1800);
 });
+const saved=store('mode');if(saved&&[...modeSel.options].some(o=>o.value===saved))modeSel.value=saved;
+updateUI();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 </script>
 </body>
