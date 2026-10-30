@@ -72,7 +72,7 @@ button.stop{background:#c92a2a}
 const $=id=>document.getElementById(id);
 const btn=$('btn'),msg=$('msg'),out=$('out'),modeSel=$('mode');
 const LABEL={alt:'Bölge',ilce:'İlçe',il:'İl',ulke:'Ülke'};
-let last='',watchId=null,wakeLock=null,cur=null,lastGeo={la:0,lo:0,t:0},busy=false,logs=[];
+let last='',watchId=null,wakeLock=null,cur=null,lastGeo={la:0,lo:0,t:0},busy=false,logs=[],pend='';
 
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(_){return null}}
 function set(id,v){$(id).textContent=v||'–'}
@@ -92,11 +92,17 @@ async function resolve(la,lo){
   const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&accept-language=tr&lat=${la}&lon=${lo}`);
   if(!r.ok)throw new Error('http '+r.status);
   const a=(await r.json()).address||{};
-  const il=a.province||a.state||a.city||'';
-  const ilce=a.town||a.county||a.city_district||a.suburb||(a.city&&a.city!==il?a.city:'')||'';
-  const koy=a.village||a.hamlet||'';
-  let alt=koy||a.neighbourhood||a.quarter||a.suburb||'';
-  if(alt===ilce||alt===il)alt=koy||a.neighbourhood||a.quarter||'';
+  const clean=v=>(v||'').replace(/\s+(Belediyesi|Belediye Başkanlığı)$/i,'').trim();
+  const isArea=v=>/\s(Mahallesi|Mah\.|Köyü)$/i.test(v);
+  const il=clean(a.province||a.state||a.city);
+  let ilce='';
+  for(const k of ['county','city_district','town','city','suburb']){
+    const v=clean(a[k]);
+    if(v&&!isArea(v)&&!(k==='city'&&v===il)){ilce=v;break}
+  }
+  const koy=clean(a.village||a.hamlet);
+  let alt=koy||clean(a.neighbourhood)||clean(a.quarter)||clean(a.suburb);
+  if(alt===ilce||alt===il)alt=koy||clean(a.neighbourhood)||clean(a.quarter);
   return {alt,ilce,il,ulke:a.country||''};
 }
 
@@ -155,19 +161,23 @@ async function onPos(pos){
   if(out.style.display==='block')showCoords(c);
   const now=Date.now();
   if(busy)return;
-  if(cur&&(dist(lastGeo.la,lastGeo.lo,c.latitude,c.longitude)<150||now-lastGeo.t<20000))return;
+  if(cur&&((!pend&&dist(lastGeo.la,lastGeo.lo,c.latitude,c.longitude)<150)||now-lastGeo.t<(pend?10000:20000)))return;
   busy=true;lastGeo.t=now;
   try{
     const info=await resolve(c.latitude,c.longitude);
     lastGeo={la:c.latitude,lo:c.longitude,t:now};
-    const prev=cur;cur=info;show(info,c);
-    msg.textContent='Takip açık • Son kontrol: '+hhmm();
     const lv=modeSel.value;
-    if(prev&&lv!=='off'&&prev[lv]&&info[lv]&&prev[lv]!==info[lv]){
-      const title=LABEL[lv]+' değişti',body=prev[lv]+' → '+info[lv];
-      addLog(title+': '+body);notify(title,body);
-      msg.textContent=title+': '+body;
-    }
+    show(info,c);
+    msg.textContent='Takip açık • Son kontrol: '+hhmm();
+    if(!cur){cur=info}
+    else if(lv!=='off'&&cur[lv]&&info[lv]&&cur[lv]!==info[lv]){
+      if(pend===info[lv]){
+        const title=LABEL[lv]+' değişti',body=cur[lv]+' → '+info[lv];
+        addLog(title+': '+body);notify(title,body);
+        msg.textContent=title+': '+body;
+        cur=info;pend='';
+      }else pend=info[lv];
+    }else{pend='';if(lv==='off'||info[lv])cur=info}
   }catch(e){msg.textContent='Takip açık • Adres şu an alınamadı, tekrar denenecek.'}
   busy=false;
 }
@@ -182,14 +192,14 @@ async function startTracking(){
   let nmsg='';
   if('Notification' in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(_){}}
   if(!('Notification' in window)||Notification.permission!=='granted')nmsg=' Bildirim izni yok, değişiklikler sadece uygulama içinde görünür.';
-  cur=null;lastGeo={la:0,lo:0,t:0};
+  cur=null;pend='';lastGeo={la:0,lo:0,t:0};
   watchId=navigator.geolocation.watchPosition(onPos,geoErr,{enableHighAccuracy:false,maximumAge:30000,timeout:30000});
   lockScreen();updateUI();
   msg.textContent='Takip başladı, konum aranıyor…'+nmsg;
 }
 function stopTracking(){
   if(watchId!==null)navigator.geolocation.clearWatch(watchId);
-  watchId=null;cur=null;
+  watchId=null;cur=null;pend='';
   if(wakeLock){try{wakeLock.release()}catch(_){}wakeLock=null}
   updateUI();msg.textContent='Takip durduruldu.';
 }
