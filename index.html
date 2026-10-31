@@ -27,6 +27,7 @@ select{display:block;width:100%;margin-top:6px;padding:12px;border-radius:12px;b
 button{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:14px 26px;font-size:16px;font-weight:600;cursor:pointer;width:100%}
 button:disabled{opacity:.6;cursor:wait}
 button.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent);margin-top:16px}
+button.small{padding:10px;font-size:14px}
 button.stop{background:#c92a2a}
 #out{margin-top:22px;display:none;text-align:left}
 .row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
@@ -34,7 +35,7 @@ button.stop{background:#c92a2a}
 .row span:last-child{font-weight:600;text-align:right}
 #msg{margin-top:16px;color:var(--muted);font-size:14px;min-height:18px}
 #logBox{display:none;margin-top:22px;text-align:left}
-#log{list-style:none;margin:0;padding:0;font-size:14px}
+#log{list-style:none;margin:0;padding:0;font-size:14px;max-height:320px;overflow-y:auto}
 #log li{padding:8px 0;border-bottom:1px solid var(--line)}
 #log small{color:var(--muted);margin-right:6px}
 .note{margin:14px 0 0;color:var(--muted);font-size:12.5px;line-height:1.45}
@@ -65,7 +66,7 @@ button.stop{background:#c92a2a}
     <div class="row"><span>Doğruluk</span><span id="acc">–</span></div>
     <button id="copy" class="ghost">Koordinatları Kopyala</button>
   </div>
-  <div id="logBox"><h2>Son değişiklikler</h2><ul id="log"></ul></div>
+  <div id="logBox"><h2>Son değişiklikler</h2><ul id="log"></ul><button id="clearLog" class="ghost small">Geçmişi Temizle</button></div>
   <p class="note" id="note"></p>
 </div>
 <script>
@@ -148,13 +149,14 @@ async function notify(title,body){
 }
 function vibrate(){if(navigator.vibrate)navigator.vibrate([200,100,200])}
 
-function addLog(text){
-  logs.unshift(hhmm()+'|'+text);logs=logs.slice(0,8);
-  $('log').innerHTML='';
-  logs.forEach(l=>{const [t,x]=l.split('|');const li=document.createElement('li');
-    const s=document.createElement('small');s.textContent=t;li.appendChild(s);li.appendChild(document.createTextNode(x));$('log').appendChild(li)});
-  $('logBox').style.display='block';
+const MAXLOG=100;
+function stamp(){return new Date().toLocaleString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+function renderLog(){
+  const ul=$('log');ul.innerHTML='';
+  logs.forEach(l=>{const li=document.createElement('li');const sm=document.createElement('small');sm.textContent=l.t;li.appendChild(sm);li.appendChild(document.createTextNode(l.x));ul.appendChild(li)});
+  $('logBox').style.display=logs.length?'block':'none';
 }
+function addLog(text){logs.unshift({t:stamp(),x:text});logs=logs.slice(0,MAXLOG);store('logs',JSON.stringify(logs));renderLog()}
 
 async function onPos(pos){
   const c=pos.coords;
@@ -221,6 +223,10 @@ $('copy').addEventListener('click',async e=>{
   setTimeout(()=>b.textContent='Koordinatları Kopyala',1800);
 });
 const saved=store('mode');if(saved&&[...modeSel.options].some(o=>o.value===saved))modeSel.value=saved;
+try{logs=JSON.parse(store('logs')||'[]')}catch(_){logs=[]}
+if(!Array.isArray(logs))logs=[];
+renderLog();
+$('clearLog').addEventListener('click',()=>{if(confirm('Geçmiş silinsin mi?')){logs=[];store('logs','[]');renderLog()}});
 updateUI();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 </script>
