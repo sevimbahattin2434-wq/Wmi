@@ -71,6 +71,7 @@ button.stop{background:#c92a2a}
     <div class="row"><span>Enlem</span><span id="lat">–</span></div>
     <div class="row"><span>Boylam</span><span id="lon">–</span></div>
     <div class="row"><span>Doğruluk</span><span id="acc">–</span></div>
+    <button id="share" style="margin-top:16px">Konumu Paylaş</button>
     <button id="copy" class="ghost">Koordinatları Kopyala</button>
   </div>
   <div id="logBox"><h2>Son değişiklikler</h2><ul id="log"></ul><button id="clearLog" class="ghost small">Geçmişi Temizle</button></div>
@@ -80,7 +81,7 @@ button.stop{background:#c92a2a}
 const $=id=>document.getElementById(id);
 const btn=$('btn'),msg=$('msg'),out=$('out'),modeSel=$('mode');
 const LABEL={ilce:'İlçe',il:'İl'};
-let last='',watchId=null,wakeLock=null,cur=null,lastGeo={la:0,lo:0,t:0},busy=false,logs=[],pend='';
+let last='',lastInfo=null,watchId=null,wakeLock=null,cur=null,lastGeo={la:0,lo:0,t:0},busy=false,logs=[],pend='';
 
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(_){return null}}
 function set(id,v){$(id).textContent=v||'–'}
@@ -117,6 +118,7 @@ async function resolve(la,lo){
 }
 
 function show(info,c){
+  lastInfo=info;
   set('alt',info.alt);set('ilce',info.ilce);set('il',info.il);set('ulke',info.ulke);
   showCoords(c);out.style.display='block';
 }
@@ -247,6 +249,20 @@ $('notif').addEventListener('change',async()=>{
   if($('notif').checked&&'Notification' in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(_){}}
 });
 $('fmt').addEventListener('change',()=>store('fmt',$('fmt').value));
+function shareText(){
+  const i=lastInfo||{};
+  const il=i.il||'',ilce=i.ilce||'';
+  const where=[i.alt,(ilce&&il&&ilce!==il)?ilce+', '+il:(ilce||il)].filter(Boolean).join(', ');
+  return '📍 Şu an '+(where||'konumum')+' civarındayım ('+hhmm()+' itibarıyla).\n🗺️ https://www.google.com/maps?q='+last.replace(/\s/g,'');
+}
+$('share').addEventListener('click',async e=>{
+  const b=e.currentTarget,text=shareText();
+  const flash=t=>{b.textContent=t;setTimeout(()=>b.textContent='Konumu Paylaş',1800)};
+  try{
+    if(navigator.share){await navigator.share({text});return}
+  }catch(err){if(err&&err.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(text);flash('Mesaj kopyalandı ✓')}catch(_){flash('Paylaşılamadı')}
+});
 $('copy').addEventListener('click',async e=>{
   const b=e.currentTarget;
   try{await navigator.clipboard.writeText(last);b.textContent='Kopyalandı ✓'}catch(_){b.textContent='Kopyalanamadı'}
