@@ -27,6 +27,8 @@ select{display:block;width:100%;margin-top:6px;padding:12px;border-radius:12px;b
 button{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:14px 26px;font-size:16px;font-weight:600;cursor:pointer;width:100%}
 button:disabled{opacity:.6;cursor:wait}
 button.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent);margin-top:16px}
+label.switch{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-size:15px;padding:4px 2px}
+label.switch input{width:22px;height:22px;accent-color:var(--accent)}
 button.small{padding:10px;font-size:14px}
 button.stop{background:#c92a2a}
 #out{margin-top:22px;display:none;text-align:left}
@@ -45,15 +47,14 @@ button.stop{background:#c92a2a}
 <div class="card">
   <h1>📍 Nerdeyiz?</h1>
   <p class="sub">Konumunu paylaş, nerede olduğunu söyleyelim.</p>
-  <label class="opt">Bildirim
+  <label class="opt">Takip
     <select id="mode">
       <option value="off">Kapalı (sadece manuel)</option>
-      <option value="alt">Bölge değişince</option>
-      <option value="ilce">İlçe değişince</option>
-      <option value="il">İl değişince</option>
-      <option value="ulke">Ülke değişince</option>
+      <option value="ilce">İlçe değişimini takip et</option>
+      <option value="il">İl değişimini takip et</option>
     </select>
   </label>
+  <label class="switch" id="notifRow"><span>Bildirim gönder</span><input type="checkbox" id="notif" checked></label>
   <button id="btn">Konumumu Bul</button>
   <div id="msg"></div>
   <div id="out">
@@ -72,7 +73,7 @@ button.stop{background:#c92a2a}
 <script>
 const $=id=>document.getElementById(id);
 const btn=$('btn'),msg=$('msg'),out=$('out'),modeSel=$('mode');
-const LABEL={alt:'Bölge',ilce:'İlçe',il:'İl',ulke:'Ülke'};
+const LABEL={ilce:'İlçe',il:'İl'};
 let last='',watchId=null,wakeLock=null,cur=null,lastGeo={la:0,lo:0,t:0},busy=false,logs=[],pend='';
 
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(_){return null}}
@@ -84,6 +85,7 @@ function dist(a,b,c,d){const R=6371000,r=x=>x*Math.PI/180,dl=r(c-a),dn=r(d-b);
 
 function updateUI(){
   const off=modeSel.value==='off';
+  $('notifRow').style.display=off?'none':'flex';
   btn.className=(!off&&tracking())?'stop':'';
   btn.textContent=off?'Konumumu Bul':(tracking()?'Takibi Durdur':'Takibi Başlat');
   $('note').textContent=off?'':'Takip, uygulama açıkken çalışır. Ekran kilitlenirse veya başka uygulamaya geçersen durabilir; bu yüzden takip sırasında ekranı açık tutmaya çalışıyoruz.';
@@ -158,6 +160,11 @@ function renderLog(){
 }
 function addLog(text){logs.unshift({t:stamp(),x:text});logs=logs.slice(0,MAXLOG);store('logs',JSON.stringify(logs));renderLog()}
 
+function keyOf(i,lv){
+  if(lv==='il')return i.il||'';
+  if(!i.ilce)return '';
+  return (i.il&&i.il!==i.ilce)?i.ilce+', '+i.il:i.ilce;
+}
 async function onPos(pos){
   const c=pos.coords;
   if(out.style.display==='block')showCoords(c);
@@ -169,17 +176,21 @@ async function onPos(pos){
     const info=await resolve(c.latitude,c.longitude);
     lastGeo={la:c.latitude,lo:c.longitude,t:now};
     const lv=modeSel.value;
+    const nk=keyOf(info,lv);
     show(info,c);
     msg.textContent='Takip açık • Son kontrol: '+hhmm();
     if(!cur){cur=info}
-    else if(lv!=='off'&&cur[lv]&&info[lv]&&cur[lv]!==info[lv]){
-      if(pend===info[lv]){
-        const title=LABEL[lv]+' değişti',body=cur[lv]+' → '+info[lv];
-        addLog(title+': '+body);notify(title,body);
-        msg.textContent=title+': '+body;
-        cur=info;pend='';
-      }else pend=info[lv];
-    }else{pend='';if(lv==='off'||info[lv])cur=info}
+    else{
+      const ok=keyOf(cur,lv);
+      if(ok&&nk&&ok!==nk){
+        if(pend===nk){
+          addLog(ok+' → '+nk);
+          if($('notif').checked)notify(nk,'Önceki: '+ok);
+          msg.textContent=nk+' (önceki: '+ok+')';
+          cur=info;pend='';
+        }else pend=nk;
+      }else{pend='';if(nk)cur=info}
+    }
   }catch(e){msg.textContent='Takip açık • Adres şu an alınamadı, tekrar denenecek.'}
   busy=false;
 }
@@ -192,8 +203,10 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 async function startTracking(){
   if(!navigator.geolocation){msg.textContent='Tarayıcın konum özelliğini desteklemiyor.';return}
   let nmsg='';
-  if('Notification' in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(_){}}
-  if(!('Notification' in window)||Notification.permission!=='granted')nmsg=' Bildirim izni yok, değişiklikler sadece uygulama içinde görünür.';
+  if($('notif').checked){
+    if('Notification' in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(_){}}
+    if(!('Notification' in window)||Notification.permission!=='granted')nmsg=' Bildirim izni yok, değişiklikler sadece uygulama içinde görünür.';
+  }
   cur=null;pend='';lastGeo={la:0,lo:0,t:0};
   watchId=navigator.geolocation.watchPosition(onPos,geoErr,{enableHighAccuracy:false,maximumAge:30000,timeout:30000});
   lockScreen();updateUI();
@@ -215,7 +228,11 @@ modeSel.addEventListener('change',()=>{
   store('mode',modeSel.value);
   if(modeSel.value==='off'&&tracking())stopTracking();
   updateUI();
-  if(modeSel.value!=='off'&&tracking())msg.textContent='Takip açık • '+LABEL[modeSel.value]+' değişince haber verilecek.';
+  if(modeSel.value!=='off'&&tracking()){pend='';msg.textContent='Takip açık • '+LABEL[modeSel.value]+' bazında izleniyor.'}
+});
+$('notif').addEventListener('change',async()=>{
+  store('notif',$('notif').checked?'1':'0');
+  if($('notif').checked&&'Notification' in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(_){}}
 });
 $('copy').addEventListener('click',async e=>{
   const b=e.currentTarget;
@@ -223,6 +240,7 @@ $('copy').addEventListener('click',async e=>{
   setTimeout(()=>b.textContent='Koordinatları Kopyala',1800);
 });
 const saved=store('mode');if(saved&&[...modeSel.options].some(o=>o.value===saved))modeSel.value=saved;
+$('notif').checked=store('notif')!=='0';
 try{logs=JSON.parse(store('logs')||'[]')}catch(_){logs=[]}
 if(!Array.isArray(logs))logs=[];
 renderLog();
