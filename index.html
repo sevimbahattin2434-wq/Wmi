@@ -54,6 +54,12 @@ button.stop{background:#c92a2a}
       <option value="il">İl değişimini takip et</option>
     </select>
   </label>
+  <label class="opt" id="fmtRow">Gösterim
+    <select id="fmt">
+      <option value="full">İlçe, İl (örn. Reşadiye, Tokat)</option>
+      <option value="short">Sadece ilçe (örn. Reşadiye)</option>
+    </select>
+  </label>
   <label class="switch" id="notifRow"><span>Bildirim gönder</span><input type="checkbox" id="notif" checked></label>
   <button id="btn">Konumumu Bul</button>
   <div id="msg"></div>
@@ -86,6 +92,7 @@ function dist(a,b,c,d){const R=6371000,r=x=>x*Math.PI/180,dl=r(c-a),dn=r(d-b);
 function updateUI(){
   const off=modeSel.value==='off';
   $('notifRow').style.display=off?'none':'flex';
+  $('fmtRow').style.display=modeSel.value==='ilce'?'block':'none';
   btn.className=(!off&&tracking())?'stop':'';
   btn.textContent=off?'Konumumu Bul':(tracking()?'Takibi Durdur':'Takibi Başlat');
   $('note').textContent=off?'':'Takip, uygulama açıkken çalışır. Ekran kilitlenirse veya başka uygulamaya geçersen durabilir; bu yüzden takip sırasında ekranı açık tutmaya çalışıyoruz.';
@@ -184,9 +191,14 @@ async function onPos(pos){
       const ok=keyOf(cur,lv);
       if(ok&&nk&&ok!==nk){
         if(pend===nk){
-          addLog(ok+' → '+nk);
-          if($('notif').checked)notify(nk,'Önceki: '+ok);
-          msg.textContent=nk+' (önceki: '+ok+')';
+          let from=ok,to=nk;
+          if(lv==='ilce'&&$('fmt').value==='short'){
+            const f=cur.ilce||ok,t=info.ilce||nk;
+            if(f!==t){from=f;to=t}
+          }
+          addLog(from+' → '+to);
+          if($('notif').checked)notify(to,'Önceki: '+from);
+          msg.textContent=to+' (önceki: '+from+')';
           cur=info;pend='';
         }else pend=nk;
       }else{pend='';if(nk)cur=info}
@@ -234,6 +246,7 @@ $('notif').addEventListener('change',async()=>{
   store('notif',$('notif').checked?'1':'0');
   if($('notif').checked&&'Notification' in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(_){}}
 });
+$('fmt').addEventListener('change',()=>store('fmt',$('fmt').value));
 $('copy').addEventListener('click',async e=>{
   const b=e.currentTarget;
   try{await navigator.clipboard.writeText(last);b.textContent='Kopyalandı ✓'}catch(_){b.textContent='Kopyalanamadı'}
@@ -241,6 +254,7 @@ $('copy').addEventListener('click',async e=>{
 });
 const saved=store('mode');if(saved&&[...modeSel.options].some(o=>o.value===saved))modeSel.value=saved;
 $('notif').checked=store('notif')!=='0';
+{const f=store('fmt');if(f==='short'||f==='full')$('fmt').value=f}
 try{logs=JSON.parse(store('logs')||'[]')}catch(_){logs=[]}
 if(!Array.isArray(logs))logs=[];
 renderLog();
